@@ -91,6 +91,13 @@ export async function withFloodRetry<T>(
 
 const entityCache = new Map<string, EntityLike>();
 
+/** Extrai o hash de um link de convite privado (t.me/+HASH ou t.me/joinchat/HASH). */
+function extractInviteHash(identifier: string): string | null {
+  const s = identifier.trim();
+  const m = /(?:t\.me\/(?:joinchat\/|\+)|^\+)([A-Za-z0-9_-]+)/i.exec(s);
+  return m ? m[1] : null;
+}
+
 function normalizeIdentifier(identifier: string): EntityLike {
   let s = identifier.trim();
   const link = /(?:https?:\/\/)?t\.me\/(?:s\/)?(@?[\w\d_]+)/i.exec(s);
@@ -100,13 +107,42 @@ function normalizeIdentifier(identifier: string): EntityLike {
   return s;
 }
 
+/** Resolve um canal privado a partir do hash do link de convite. */
+async function resolveInvite(hash: string): Promise<EntityLike> {
+  const client = await getClient();
+  const info = await withFloodRetry(() =>
+    client.invoke(new Api.messages.CheckChatInvite({ hash })),
+  );
+  // Já é membro (ou tem acesso de leitura): usa o chat diretamente.
+  if (
+    info instanceof Api.ChatInviteAlready ||
+    info instanceof Api.ChatInvitePeek
+  ) {
+    return info.chat as unknown as EntityLike;
+  }
+  // Ainda não é membro: entra no canal pelo convite.
+  const updates = await withFloodRetry(() =>
+    client.invoke(new Api.messages.ImportChatInvite({ hash })),
+  );
+  const chats = (updates as { chats?: Api.TypeChat[] }).chats;
+  if (chats && chats.length > 0) {
+    return chats[0] as unknown as EntityLike;
+  }
+  throw new Error("Não foi possível acessar o canal por esse link de convite.");
+}
+
 export async function resolveEntity(identifier: string) {
   const cached = entityCache.get(identifier);
   if (cached) return cached;
-  const client = await getClient();
-  const entity = await withFloodRetry(() =>
-    client.getEntity(normalizeIdentifier(identifier)),
-  );
+
+  const inviteHash = extractInviteHash(identifier);
+  const entity = inviteHash
+    ? await resolveInvite(inviteHash)
+    : await withFloodRetry(async () => {
+        const client = await getClient();
+        return client.getEntity(normalizeIdentifier(identifier));
+      });
+
   entityCache.set(identifier, entity);
   return entity;
 }
