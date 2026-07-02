@@ -3,6 +3,34 @@
 import { useEffect, useState } from "react";
 import type { IndexJob } from "@/lib/index-jobs";
 
+/** Interpreta a lista em blocos de 3 linhas: nome, link, endereço da capa. */
+function parseBulkList(
+  text: string,
+): { name: string; link: string; cover?: string }[] {
+  let blocks = text
+    .split(/\n\s*\n/)
+    .map((b) =>
+      b
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean),
+    )
+    .filter((b) => b.length > 0);
+
+  // Se veio tudo grudado (um bloco só grande), agrupa de 3 em 3.
+  if (blocks.length === 1 && blocks[0].length > 3) {
+    const lines = blocks[0];
+    blocks = [];
+    for (let i = 0; i < lines.length; i += 3) {
+      blocks.push(lines.slice(i, i + 3));
+    }
+  }
+
+  return blocks
+    .map((b) => ({ name: b[0], link: b[1], cover: b[2] || undefined }))
+    .filter((e) => e.name && e.link);
+}
+
 export default function ImportPanel() {
   const [identifier, setIdentifier] = useState("");
   const [seriesTitle, setSeriesTitle] = useState("");
@@ -11,6 +39,9 @@ export default function ImportPanel() {
   const [jobs, setJobs] = useState<IndexJob[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [bulk, setBulk] = useState("");
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   async function loadJobs() {
     try {
@@ -54,6 +85,35 @@ export default function ImportPanel() {
     setIdentifier("");
     setSeriesTitle("");
     setSeasonLabel("");
+    loadJobs();
+  }
+
+  async function submitBulk(e: React.FormEvent) {
+    e.preventDefault();
+    const entries = parseBulkList(bulk);
+    if (entries.length === 0) {
+      setBulkMsg(
+        "Cole ao menos uma série (3 linhas: nome, link, endereço da imagem).",
+      );
+      return;
+    }
+    setBulkSubmitting(true);
+    setBulkMsg(null);
+    const r = await fetch("/api/admin/index-many", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channels: entries, withThumbnails }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBulkSubmitting(false);
+    if (!r.ok) {
+      setBulkMsg(d.error ?? "Erro ao importar.");
+      return;
+    }
+    setBulkMsg(
+      `${entries.length} série(s) na fila! Vão importar uma por uma — acompanhe abaixo.`,
+    );
+    setBulk("");
     loadJobs();
   }
 
@@ -111,6 +171,47 @@ export default function ImportPanel() {
           className="mt-1 self-start rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? "Iniciando..." : "Importar canal"}
+        </button>
+      </form>
+
+      <form
+        onSubmit={submitBulk}
+        className="flex flex-col gap-3 rounded-lg border border-white/10 p-4"
+      >
+        <h3 className="text-sm font-semibold">Importar várias de uma vez</h3>
+        <p className="text-xs text-zinc-400">
+          Para cada série, <strong>3 linhas</strong> nesta ordem:
+          <br />
+          <span className="text-zinc-500">
+            nome
+            <br />
+            link do canal
+            <br />
+            endereço da imagem (capa)
+          </span>
+          <br />
+          Separe cada série com uma linha em branco.
+        </p>
+        {bulkMsg && (
+          <div className="rounded-md bg-white/10 px-3 py-2 text-sm">
+            {bulkMsg}
+          </div>
+        )}
+        <textarea
+          value={bulk}
+          onChange={(e) => setBulk(e.target.value)}
+          rows={10}
+          placeholder={
+            "Malhação 1998\nhttps://t.me/+xxxx\nhttps://site.com/poster1998.jpg\n\nMalhação 1999\nhttps://t.me/+yyyy\nhttps://site.com/poster1999.jpg"
+          }
+          className="rounded-md border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs outline-none focus:border-brand"
+        />
+        <button
+          type="submit"
+          disabled={bulkSubmitting}
+          className="mt-1 self-start rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {bulkSubmitting ? "Enviando..." : "Importar todas"}
         </button>
       </form>
 
