@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import CoverUploader from "@/components/CoverUploader";
 import { requireAdmin } from "@/lib/auth";
 import { getAdminSeries } from "@/lib/admin-data";
 import {
@@ -29,6 +30,14 @@ export default async function AdminSeriePage({
       </Link>
       <h1 className="mb-6 mt-2 text-2xl font-bold">Editar série</h1>
 
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-semibold">Capa da série</h2>
+        <CoverUploader
+          seriesId={series.id}
+          currentCoverUrl={series.coverUrl}
+        />
+      </section>
+
       <form action={updateSeriesAction} className="mb-10 flex flex-col gap-3">
         <input type="hidden" name="id" value={series.id} />
         <label className="flex flex-col gap-1 text-sm">
@@ -45,15 +54,6 @@ export default async function AdminSeriePage({
             name="description"
             defaultValue={series.description ?? ""}
             rows={3}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          URL da capa (opcional)
-          <input
-            name="coverUrl"
-            defaultValue={series.coverUrl ?? ""}
-            placeholder="https://..."
             className="rounded-md border border-white/10 bg-white/5 px-3 py-2"
           />
         </label>

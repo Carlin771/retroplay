@@ -9,7 +9,6 @@ export async function updateSeriesAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const coverUrl = String(formData.get("coverUrl") ?? "").trim();
   const hidden = formData.get("hidden") === "on";
   if (!id || !title) return;
   await prisma.series.update({
@@ -17,7 +16,6 @@ export async function updateSeriesAction(formData: FormData) {
     data: {
       title,
       description: description || null,
-      coverUrl: coverUrl || null,
       hidden,
     },
   });
