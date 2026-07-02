@@ -12,15 +12,12 @@ export default function ContinueCard({ item }: { item: ContinueItem }) {
       className="group block w-56 shrink-0 sm:w-64"
     >
       <div className="relative aspect-video overflow-hidden rounded-lg bg-zinc-800">
-        {item.thumbDataUrl ? (
-          <img
-            src={item.thumbDataUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-zinc-700 to-zinc-900" />
-        )}
+        <img
+          src={`/api/thumb/${item.episodeId}`}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
         <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition group-hover:opacity-100">
           <Play className="h-10 w-10" />
         </div>

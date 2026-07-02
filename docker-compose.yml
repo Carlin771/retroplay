@@ -5,6 +5,7 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=3072"
       # O banco e o cache ficam no volume persistente /data.
       DATABASE_URL: "file:/data/app.db"
       CACHE_DIR: "/data/cache"

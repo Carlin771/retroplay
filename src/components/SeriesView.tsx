@@ -64,15 +64,12 @@ export default function SeriesView({
                 className="group flex gap-4 rounded-lg p-2 hover:bg-white/5"
               >
                 <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-md bg-zinc-800 sm:w-48">
-                  {ep.thumbDataUrl ? (
-                    <img
-                      src={ep.thumbDataUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-gradient-to-br from-zinc-700 to-zinc-900" />
-                  )}
+                  <img
+                    src={`/api/thumb/${ep.id}`}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition group-hover:opacity-100">
                     <Play className="h-8 w-8" />
                   </div>

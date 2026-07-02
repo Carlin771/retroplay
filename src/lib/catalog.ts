@@ -17,16 +17,7 @@ export async function getVisibleSeries(): Promise<SeriesCardData[]> {
     include: {
       seasons: {
         where: { hidden: false },
-        orderBy: { order: "asc" },
-        include: {
-          _count: { select: { episodes: true } },
-          episodes: {
-            where: { hidden: false },
-            orderBy: { number: "asc" },
-            take: 1,
-            select: { thumbDataUrl: true },
-          },
-        },
+        select: { _count: { select: { episodes: true } } },
       },
     },
   });
@@ -36,12 +27,11 @@ export async function getVisibleSeries(): Promise<SeriesCardData[]> {
       (acc, se) => acc + se._count.episodes,
       0,
     );
-    const firstThumb = s.seasons[0]?.episodes[0]?.thumbDataUrl ?? null;
     return {
       id: s.id,
       title: s.title,
       description: s.description,
-      coverUrl: s.coverUrl ?? firstThumb,
+      coverUrl: s.coverUrl,
       seasonsCount: s.seasons.length,
       episodeCount,
     };
@@ -52,7 +42,6 @@ export type ContinueItem = {
   episodeId: string;
   number: number;
   title: string | null;
-  thumbDataUrl: string | null;
   positionSec: number;
   durationSec: number;
   seriesId: string;
@@ -79,7 +68,6 @@ export async function getContinueWatching(
       episodeId: r.episodeId,
       number: r.episode.number,
       title: r.episode.title,
-      thumbDataUrl: r.episode.thumbDataUrl,
       positionSec: r.positionSec,
       durationSec: r.durationSec || r.episode.durationSec || 0,
       seriesId: r.episode.season.seriesId,
@@ -93,7 +81,6 @@ export type EpisodeLite = {
   number: number;
   title: string | null;
   durationSec: number | null;
-  thumbDataUrl: string | null;
 };
 
 export type SeasonWithEpisodes = {
@@ -128,7 +115,6 @@ export async function getSeriesDetail(id: string): Promise<SeriesDetail | null> 
               number: true,
               title: true,
               durationSec: true,
-              thumbDataUrl: true,
             },
           },
         },
@@ -150,7 +136,6 @@ export async function getSeriesDetail(id: string): Promise<SeriesDetail | null> 
         number: e.number,
         title: e.title,
         durationSec: e.durationSec,
-        thumbDataUrl: e.thumbDataUrl,
       })),
     })),
   };
