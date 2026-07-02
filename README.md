@@ -16,6 +16,7 @@ Veja o guia passo a passo em **[DEPLOY.md](./DEPLOY.md)** (feito para quem não 
 
 ```bash
 npm install
+npx prisma generate       # gera o cliente do banco
 cp .env.example .env      # preencha AUTH_SECRET e, para vídeo, as chaves do Telegram
 npm run db:push           # cria o banco SQLite
 npm run create:admin      # cria o admin (usa ADMIN_EMAIL/ADMIN_PASSWORD do .env)
