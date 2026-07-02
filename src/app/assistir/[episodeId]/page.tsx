@@ -21,7 +21,7 @@ export default async function AssistirPage({
 
   return (
     <div className="flex flex-col">
-      <div className="aspect-video w-full bg-black">
+      <div className="flex justify-center bg-black">
         <VideoPlayer
           episodeId={info.episode.id}
           startPositionSec={info.startPositionSec}

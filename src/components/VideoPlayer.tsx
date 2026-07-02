@@ -95,7 +95,7 @@ export default function VideoPlayer({
       onTimeUpdate={onTimeUpdate}
       onPause={onPause}
       onEnded={onEnded}
-      className="h-full w-full bg-black"
+      className="mx-auto max-h-[85vh] w-auto max-w-full bg-black"
     />
   );
 }
