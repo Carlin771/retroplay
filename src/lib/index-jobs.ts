@@ -37,5 +37,5 @@ export function updateJob(id: string, patch: Partial<IndexJob>): void {
 export function listJobs(): IndexJob[] {
   return [...jobs.values()]
     .sort((a, b) => b.startedAt - a.startedAt)
-    .slice(0, 20);
+    .slice(0, 100);
 }

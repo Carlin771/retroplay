@@ -31,6 +31,23 @@ function parseBulkList(
     .filter((e) => e.name && e.link);
 }
 
+/** Deixa o erro do job mais amigável (principalmente o limite do Telegram). */
+function formatJobError(error: string | undefined): string {
+  const e = error ?? "";
+  const wait = /A wait of (\d+) seconds/i.exec(e);
+  if (wait) {
+    const min = Math.ceil(parseInt(wait[1], 10) / 60);
+    return `Telegram limitou a entrada em canais. Aguarde ~${min} min e clique em "Tentar novamente os que faltam".`;
+  }
+  if (/INVITE_HASH_EXPIRED/i.test(e)) {
+    return "Link de convite expirado — gere um link novo desse canal no Telegram.";
+  }
+  if (/Cannot find any entity/i.test(e)) {
+    return "Canal não encontrado — confira o link/@.";
+  }
+  return e;
+}
+
 export default function ImportPanel() {
   const [identifier, setIdentifier] = useState("");
   const [seriesTitle, setSeriesTitle] = useState("");
@@ -111,9 +128,43 @@ export default function ImportPanel() {
       return;
     }
     setBulkMsg(
-      `${entries.length} série(s) na fila! Vão importar uma por uma — acompanhe abaixo.`,
+      `${entries.length} série(s) na fila! Vão importar uma por uma — acompanhe abaixo. (A lista continua aqui: se o Telegram limitar, espere e use "Tentar novamente os que faltam".)`,
     );
-    setBulk("");
+    loadJobs();
+  }
+
+  async function retryPending() {
+    const entries = parseBulkList(bulk);
+    if (entries.length === 0) {
+      setBulkMsg("Cole a lista na caixa acima primeiro.");
+      return;
+    }
+    const busy = new Set(
+      jobs
+        .filter((j) => j.status === "done" || j.status === "running")
+        .map((j) => j.identifier),
+    );
+    const pending = entries.filter((e) => !busy.has(e.name));
+    if (pending.length === 0) {
+      setBulkMsg("Tudo importado! 🎉");
+      return;
+    }
+    setBulkSubmitting(true);
+    setBulkMsg(null);
+    const r = await fetch("/api/admin/index-many", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channels: pending, withThumbnails }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setBulkSubmitting(false);
+    if (!r.ok) {
+      setBulkMsg(d.error ?? "Erro ao reenviar.");
+      return;
+    }
+    setBulkMsg(
+      `Continuando: ${pending.length} série(s) que faltavam foram reenviadas.`,
+    );
     loadJobs();
   }
 
@@ -217,20 +268,31 @@ export default function ImportPanel() {
 
       {jobs.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-zinc-300">Importações</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-zinc-300">Importações</h3>
+            <button
+              type="button"
+              onClick={retryPending}
+              disabled={bulkSubmitting}
+              className="rounded-md bg-white/10 px-3 py-1.5 text-xs hover:bg-white/20 disabled:opacity-40"
+            >
+              {bulkSubmitting ? "..." : "Tentar novamente os que faltam"}
+            </button>
+          </div>
           {jobs.map((j) => (
             <div
               key={j.id}
-              className="flex items-center justify-between rounded-md border border-white/10 px-3 py-2 text-sm"
+              className="flex items-start justify-between gap-3 rounded-md border border-white/10 px-3 py-2 text-sm"
             >
-              <span className="truncate">{j.identifier}</span>
-              <span className="ml-3 shrink-0 text-zinc-400">
-                {j.status === "running" &&
-                  `importando... ${j.imported} cap.`}
+              <span className="shrink-0 font-medium">{j.identifier}</span>
+              <span className="text-right text-zinc-400">
+                {j.status === "running" && `importando... ${j.imported} cap.`}
                 {j.status === "done" &&
                   `✓ ${j.imported} novos (${j.total} no canal)`}
                 {j.status === "error" && (
-                  <span className="text-red-300">erro: {j.error}</span>
+                  <span className="text-red-300">
+                    {formatJobError(j.error)}
+                  </span>
                 )}
               </span>
             </div>
