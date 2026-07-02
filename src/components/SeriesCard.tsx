@@ -24,9 +24,8 @@ export default function SeriesCard({ series }: { series: SeriesCardData }) {
       <div className="mt-2">
         <p className="truncate text-sm font-medium">{series.title}</p>
         <p className="text-xs text-zinc-400">
-          {series.seasonsCount}{" "}
-          {series.seasonsCount === 1 ? "temporada" : "temporadas"} ·{" "}
-          {series.episodeCount} cap.
+          {series.episodeCount}{" "}
+          {series.episodeCount === 1 ? "episódio" : "episódios"}
         </p>
       </div>
     </Link>
