@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.kiro
+cache
+data
+prisma/*.db
+prisma/*.db-journal
+.env
+.env.*
+*.session
+npm-debug.log*
+Dockerfile
+.dockerignore
+docker-compose.yml

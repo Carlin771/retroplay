@@ -1,0 +1,6 @@
+# Caddy cuida do HTTPS automaticamente (certificado gratuito Let's Encrypt).
+# O domínio vem da variável SITE_DOMAIN (definida no .env).
+{$SITE_DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+}

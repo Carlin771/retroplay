@@ -1,0 +1,78 @@
+// Schema do banco de dados (SQLite via Prisma).
+// Modelo: Série -> Temporada (1 canal do Telegram) -> Capítulo (1 vídeo).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  name         String?
+  role         String          @default("USER") // "USER" | "ADMIN"
+  createdAt    DateTime        @default(now())
+  progress     WatchProgress[]
+}
+
+model Series {
+  id          String   @id @default(cuid())
+  title       String   @unique
+  description String?
+  coverUrl    String?
+  hidden      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  seasons     Season[]
+}
+
+model Season {
+  id                   String    @id @default(cuid())
+  series               Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  seriesId             String
+  label                String // ex.: "1995"
+  order                Int       @default(0)
+  telegramChannelId    String // identificador do canal no Telegram
+  telegramChannelTitle String?
+  hidden               Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  episodes             Episode[]
+
+  @@unique([seriesId, label])
+}
+
+model Episode {
+  id                String          @id @default(cuid())
+  season            Season          @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  seasonId          String
+  number            Int // capítulo 1, 2, 3...
+  title             String?
+  telegramMessageId Int // id da mensagem no canal (estável)
+  durationSec       Int?
+  sizeBytes         BigInt?
+  thumbDataUrl      String? // miniatura embutida (data URL base64)
+  hidden            Boolean         @default(false)
+  addedAt           DateTime        @default(now())
+  progress          WatchProgress[]
+
+  @@unique([seasonId, telegramMessageId])
+  @@unique([seasonId, number])
+}
+
+model WatchProgress {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  episode     Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  episodeId   String
+  positionSec Int      @default(0)
+  durationSec Int      @default(0)
+  completed   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, episodeId])
+}
