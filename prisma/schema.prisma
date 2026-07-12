@@ -17,6 +17,7 @@ model User {
   name         String?
   role         String          @default("USER") // "USER" | "ADMIN"
   createdAt    DateTime        @default(now())
+  expiresAt    DateTime? // se preenchido: acesso de teste que expira nesta data
   progress     WatchProgress[]
 }
 

@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, SkipForward } from "lucide-react";
-import { getSession } from "@/lib/auth";
+import { getActiveUser } from "@/lib/auth";
 import { getPlaybackInfo } from "@/lib/catalog";
 import VideoPlayer from "@/components/VideoPlayer";
 
@@ -13,10 +13,11 @@ export default async function AssistirPage({
   params: Promise<{ episodeId: string }>;
 }) {
   const { episodeId } = await params;
-  const session = await getSession();
-  if (!session) redirect("/login");
+  // getActiveUser barra quem não está logado e quem tem acesso de teste expirado.
+  const user = await getActiveUser();
+  if (!user) redirect("/login");
 
-  const info = await getPlaybackInfo(episodeId, session.userId);
+  const info = await getPlaybackInfo(episodeId, user.id);
   if (!info) notFound();
 
   return (

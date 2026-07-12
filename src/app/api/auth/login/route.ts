@@ -33,16 +33,32 @@ export async function POST(req: NextRequest) {
   const ok = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!ok) return invalid();
 
-  const token = await signSession({
-    userId: user.id,
-    role: user.role,
-    email: user.email,
-  });
+  // Acesso de teste expirado: bloqueia (só revelamos após a senha estar correta).
+  if (user.expiresAt && user.expiresAt.getTime() <= Date.now()) {
+    return NextResponse.json(
+      { error: "Este acesso expirou. Peça um novo ao administrador." },
+      { status: 401 },
+    );
+  }
+
+  const token = await signSession(
+    {
+      userId: user.id,
+      role: user.role,
+      email: user.email,
+    },
+    user.expiresAt,
+  );
+
+  // Para acesso de teste, o cookie também expira junto com o acesso.
+  const maxAge = user.expiresAt
+    ? Math.max(1, Math.floor((user.expiresAt.getTime() - Date.now()) / 1000))
+    : undefined;
 
   const res = NextResponse.json({
     ok: true,
     user: { id: user.id, email: user.email, role: user.role },
   });
-  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+  res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(maxAge));
   return res;
 }

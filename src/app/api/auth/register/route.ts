@@ -23,6 +23,17 @@ export async function POST(req: NextRequest) {
   const email = parsed.data.email.toLowerCase();
   const { password, name } = parsed.data;
 
+  // Cadastro público desativado. O endpoint só serve para criar o PRIMEIRO
+  // usuário (bootstrap do admin) quando o banco ainda está vazio. Depois disso,
+  // novos acessos são criados apenas pelo administrador na aba "Acessos".
+  const isFirstUser = (await prisma.user.count()) === 0;
+  if (!isFirstUser) {
+    return NextResponse.json(
+      { error: "Cadastro desativado. Peça um acesso ao administrador." },
+      { status: 403 },
+    );
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json(
@@ -30,9 +41,6 @@ export async function POST(req: NextRequest) {
       { status: 409 },
     );
   }
-
-  // O primeiro usuário cadastrado se torna administrador.
-  const isFirstUser = (await prisma.user.count()) === 0;
 
   const user = await prisma.user.create({
     data: {

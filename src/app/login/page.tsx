@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { SITE_NAME } from "@/lib/site";
 
 export default function LoginPage() {
@@ -74,10 +73,8 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-6 text-sm text-zinc-400">
-        Não tem conta?{" "}
-        <Link href="/cadastro" className="text-white underline">
-          Criar conta
-        </Link>
+        O acesso é liberado pelo administrador. Não tem login? Fale com quem
+        administra o site.
       </p>
     </div>
   );

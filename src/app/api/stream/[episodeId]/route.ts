@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getActiveUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { resolveEpisodeMedia, downloadRange } from "@/lib/telegram";
 import { getSegment, SEGMENT_SIZE } from "@/lib/cache";
@@ -12,8 +12,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ episodeId: string }> },
 ) {
-  const session = await getSession();
-  if (!session) {
+  // getActiveUser bloqueia quem não está logado E quem tem acesso de teste expirado.
+  const user = await getActiveUser();
+  if (!user) {
     return new Response("Faça login para assistir.", { status: 401 });
   }
 
