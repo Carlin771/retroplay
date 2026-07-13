@@ -66,12 +66,21 @@ export default function AccessManager({
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // "Relógio" que atualiza o status online e o tempo de teste na lista.
+  // "Relógio" que atualiza os rótulos relativos (visto há X, online) a cada 1s.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-refresh: rebusca os dados do servidor a cada 10s (só com a aba visível),
+  // para refletir quem está online/assistindo e o tempo de teste quase ao vivo.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
