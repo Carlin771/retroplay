@@ -16,6 +16,18 @@ const createSchema = z.object({
   testMinutes: z.number().int().positive().max(MAX_TEST_MINUTES).optional(),
 });
 
+// Alterar o tipo de um acesso existente.
+// trialMinutes = null  -> torna permanente
+// trialMinutes = número -> vira acesso de teste com esse saldo (zera o usado)
+const patchSchema = z.object({
+  trialMinutes: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_TEST_MINUTES)
+    .nullable(),
+});
+
 async function requireAdminApi() {
   const session = await getSession();
   if (!session || session.role !== "ADMIN") return null;
@@ -104,5 +116,58 @@ export async function DELETE(req: NextRequest) {
   }
 
   await prisma.user.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await requireAdminApi();
+  if (!session) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "ID ausente." }, { status: 400 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
+  }
+
+  if (id === session.userId) {
+    return NextResponse.json(
+      { error: "Você não pode alterar o seu próprio acesso." },
+      { status: 400 },
+    );
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "Acesso não encontrado." }, { status: 404 });
+  }
+  if (target.role === "ADMIN") {
+    return NextResponse.json(
+      { error: "Não é possível alterar um administrador por aqui." },
+      { status: 403 },
+    );
+  }
+
+  const { trialMinutes } = parsed.data;
+  const trialSecondsTotal = trialMinutes ? trialMinutes * 60 : null;
+
+  await prisma.user.update({
+    where: { id },
+    data: {
+      trialSecondsTotal, // null = permanente
+      trialSecondsUsed: 0, // zera o tempo já consumido
+      expiresAt: null, // limpa expiração legada, se houver
+    },
+  });
+
   return NextResponse.json({ ok: true });
 }

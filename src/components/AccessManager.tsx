@@ -132,6 +132,34 @@ export default function AccessManager({
     router.refresh();
   }
 
+  async function onChangeType(
+    id: string,
+    label: string,
+    value: string,
+    wasTrial: boolean,
+  ) {
+    const trialMinutes = value === "perm" ? null : Number(value);
+    const msg =
+      trialMinutes === null
+        ? `Tornar "${label}" um acesso permanente?`
+        : `Aplicar teste de ${trialMinutes} min em "${label}"?${
+            wasTrial ? " Isso zera o tempo de teste já usado." : ""
+          }`;
+    if (!confirm(msg)) return;
+
+    const res = await fetch(`/api/admin/access?id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trialMinutes }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Não foi possível alterar o acesso.");
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <div className="flex flex-col gap-8">
       {/* Formulário de criação */}
@@ -327,13 +355,47 @@ export default function AccessManager({
                 </div>
 
                 {!isAdmin && !isSelf && (
-                  <button
-                    onClick={() => onDelete(a.id, a.email)}
-                    aria-label={`Excluir acesso de ${a.email}`}
-                    className="shrink-0 rounded-md p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        e.target.value = "";
+                        if (v) onChangeType(a.id, a.email, v, isTrial);
+                      }}
+                      aria-label={`Alterar tipo do acesso de ${a.email}`}
+                      className="rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-brand"
+                    >
+                      <option value="">Alterar…</option>
+                      {isTrial && (
+                        <option value="perm" className="bg-zinc-900">
+                          Tornar permanente
+                        </option>
+                      )}
+                      <option value="5" className="bg-zinc-900">
+                        Teste 5 min
+                      </option>
+                      <option value="10" className="bg-zinc-900">
+                        Teste 10 min
+                      </option>
+                      <option value="15" className="bg-zinc-900">
+                        Teste 15 min
+                      </option>
+                      <option value="30" className="bg-zinc-900">
+                        Teste 30 min
+                      </option>
+                      <option value="60" className="bg-zinc-900">
+                        Teste 60 min
+                      </option>
+                    </select>
+                    <button
+                      onClick={() => onDelete(a.id, a.email)}
+                      aria-label={`Excluir acesso de ${a.email}`}
+                      className="rounded-md p-2 text-zinc-400 hover:bg-red-500/15 hover:text-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
             );
