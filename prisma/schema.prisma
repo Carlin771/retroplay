@@ -17,7 +17,13 @@ model User {
   name         String?
   role         String          @default("USER") // "USER" | "ADMIN"
   createdAt    DateTime        @default(now())
-  expiresAt    DateTime? // se preenchido: acesso de teste que expira nesta data
+  // Acesso de teste baseado em TEMPO ASSISTINDO (o relógio só corre enquanto o
+  // vídeo toca). trialSecondsTotal = saldo total; trialSecondsUsed = já gasto.
+  trialSecondsTotal Int? // nulo = acesso permanente
+  trialSecondsUsed  Int      @default(0)
+  lastSeenAt        DateTime? // última atividade (para status "online/assistindo")
+  // Legado: expiração por relógio (mantido por compatibilidade; novos testes usam o saldo acima).
+  expiresAt    DateTime?
   progress     WatchProgress[]
 }
 

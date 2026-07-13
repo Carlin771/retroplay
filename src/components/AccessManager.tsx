@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check, Trash2, Clock, Infinity as InfinityIcon } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Trash2,
+  Clock,
+  Infinity as InfinityIcon,
+} from "lucide-react";
 
 export type Access = {
   id: string;
@@ -10,7 +16,9 @@ export type Access = {
   name: string | null;
   role: string;
   createdAt: string;
-  expiresAt: string | null;
+  trialSecondsTotal: number | null; // null = permanente
+  trialSecondsUsed: number;
+  lastSeenAt: string | null;
 };
 
 type Props = {
@@ -19,15 +27,23 @@ type Props = {
 };
 
 const TEST_OPTIONS = [5, 10, 15, 30, 60];
+const ONLINE_WINDOW_MS = 60_000; // visto nos últimos 60s = "assistindo agora"
 
-function formatLeft(ms: number): string {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}h ${m}min`;
-  if (m > 0) return `${m}min ${s}s`;
-  return `${s}s`;
+function fmtMin(totalSec: number): string {
+  if (totalSec < 60) return `${Math.max(0, Math.floor(totalSec))}s`;
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  return s > 0 && m < 10 ? `${m}min ${s}s` : `${m}min`;
+}
+
+function fmtAgo(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return "há poucos segundos";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `há ${m}min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
 }
 
 export default function AccessManager({
@@ -50,7 +66,7 @@ export default function AccessManager({
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // "Relógio" que atualiza a contagem regressiva dos acessos de teste.
+  // "Relógio" que atualiza o status online e o tempo de teste na lista.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -123,7 +139,8 @@ export default function AccessManager({
         <h2 className="mb-1 text-lg font-semibold">Criar novo acesso</h2>
         <p className="mb-4 text-sm text-zinc-400">
           Defina um login (e-mail) e uma senha e envie para a pessoa. Marque
-          &quot;acesso de teste&quot; para ele expirar sozinho depois de um tempo.
+          &quot;acesso de teste&quot; para dar um tempo limitado que só corre
+          enquanto a pessoa está assistindo.
         </p>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -135,7 +152,9 @@ export default function AccessManager({
 
           {created && (
             <div className="rounded-md bg-emerald-500/15 px-3 py-3 text-sm text-emerald-200">
-              <p className="mb-2 font-medium">Acesso criado. Envie para a pessoa:</p>
+              <p className="mb-2 font-medium">
+                Acesso criado. Envie para a pessoa:
+              </p>
               <div className="flex flex-col gap-1 font-mono text-xs">
                 <span>Login: {created.email}</span>
                 <span>Senha: {created.password}</span>
@@ -205,12 +224,12 @@ export default function AccessManager({
               onChange={(e) => setIsTest(e.target.checked)}
               className="h-4 w-4 accent-brand"
             />
-            Acesso de teste (expira sozinho)
+            Acesso de teste (conta só o tempo assistindo)
           </label>
 
           {isTest && (
             <label className="flex flex-col gap-1 text-sm">
-              Expira depois de
+              Tempo de teste (só corre enquanto assiste)
               <select
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
@@ -244,8 +263,13 @@ export default function AccessManager({
           {initialAccesses.map((a) => {
             const isAdmin = a.role === "ADMIN";
             const isSelf = a.id === currentUserId;
-            const expMs = a.expiresAt ? new Date(a.expiresAt).getTime() : null;
-            const expired = expMs != null && expMs <= now;
+            const isTrial = a.trialSecondsTotal != null;
+            const totalSec = a.trialSecondsTotal ?? 0;
+            const usedSec = a.trialSecondsUsed;
+            const remainingSec = Math.max(0, totalSec - usedSec);
+            const exhausted = isTrial && usedSec >= totalSec;
+            const lastMs = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : null;
+            const onlineNow = lastMs != null && now - lastMs < ONLINE_WINDOW_MS;
 
             return (
               <div
@@ -253,27 +277,51 @@ export default function AccessManager({
                 className="flex items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-medium">{a.email}</span>
                     {isAdmin && (
                       <span className="rounded bg-brand/20 px-2 py-0.5 text-xs text-brand">
                         admin
                       </span>
                     )}
-                  </div>
-                  <div className="mt-0.5 text-xs text-zinc-400">
-                    {a.name ? `${a.name} · ` : ""}
-                    {expMs == null ? (
-                      <span className="inline-flex items-center gap-1">
-                        <InfinityIcon className="h-3 w-3" /> acesso permanente
+                    {onlineNow && !isAdmin && (
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        assistindo agora
                       </span>
-                    ) : expired ? (
-                      <span className="text-red-400">acesso de teste expirado</span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-400">
+                    {a.name && <span>{a.name}</span>}
+                    {a.name && <span aria-hidden>·</span>}
+
+                    {!isTrial ? (
+                      <span className="inline-flex items-center gap-1">
+                        <InfinityIcon className="h-3 w-3" /> permanente
+                      </span>
+                    ) : exhausted ? (
+                      <span className="text-red-400">
+                        teste esgotado (assistiu {fmtMin(usedSec)})
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-amber-300">
-                        <Clock className="h-3 w-3" /> teste · expira em{" "}
-                        {formatLeft(expMs - now)}
+                        <Clock className="h-3 w-3" /> teste · assistiu{" "}
+                        {fmtMin(usedSec)} de {fmtMin(totalSec)} (restam{" "}
+                        {fmtMin(remainingSec)})
                       </span>
+                    )}
+
+                    {!isAdmin && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>
+                          {lastMs == null
+                            ? "nunca acessou"
+                            : onlineNow
+                              ? "online"
+                              : `visto ${fmtAgo(now - lastMs)}`}
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>

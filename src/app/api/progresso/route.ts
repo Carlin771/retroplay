@@ -49,5 +49,42 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ ok: true });
+  // Marca presença ("online/assistindo") e, se for acesso de teste, consome o
+  // saldo de tempo. O relógio só avança entre pings, que só ocorrem enquanto o
+  // vídeo está tocando — então pausa não conta. CAP evita contar pausas longas.
+  const CAP_SEC = 15;
+  const now = new Date();
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: {
+      trialSecondsTotal: true,
+      trialSecondsUsed: true,
+      lastSeenAt: true,
+    },
+  });
+
+  let blocked = false;
+  let remainingSec: number | null = null;
+
+  if (user && user.trialSecondsTotal != null) {
+    const lastMs = user.lastSeenAt ? user.lastSeenAt.getTime() : null;
+    const delta =
+      lastMs != null
+        ? Math.min(CAP_SEC, Math.max(0, Math.floor((now.getTime() - lastMs) / 1000)))
+        : 0;
+    const used = Math.min(user.trialSecondsTotal, user.trialSecondsUsed + delta);
+    remainingSec = Math.max(0, user.trialSecondsTotal - used);
+    blocked = used >= user.trialSecondsTotal;
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: { trialSecondsUsed: used, lastSeenAt: now },
+    });
+  } else if (user) {
+    await prisma.user.update({
+      where: { id: session.userId },
+      data: { lastSeenAt: now },
+    });
+  }
+
+  return NextResponse.json({ ok: true, blocked, remainingSec });
 }

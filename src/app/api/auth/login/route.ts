@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
-import { signSession, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth";
+import {
+  signSession,
+  sessionCookieOptions,
+  SESSION_COOKIE,
+  isTrialExhausted,
+  isClockExpired,
+} from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -33,10 +39,16 @@ export async function POST(req: NextRequest) {
   const ok = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!ok) return invalid();
 
-  // Acesso de teste expirado: bloqueia (só revelamos após a senha estar correta).
-  if (user.expiresAt && user.expiresAt.getTime() <= Date.now()) {
+  // Bloqueios (só revelamos após a senha estar correta).
+  if (isClockExpired(user)) {
     return NextResponse.json(
       { error: "Este acesso expirou. Peça um novo ao administrador." },
+      { status: 401 },
+    );
+  }
+  if (isTrialExhausted(user)) {
+    return NextResponse.json(
+      { error: "Seu tempo de teste acabou. Peça um novo acesso ao administrador." },
       { status: 401 },
     );
   }

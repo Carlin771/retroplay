@@ -6,7 +6,9 @@ export type AccessRow = {
   name: string | null;
   role: string;
   createdAt: string; // ISO
-  expiresAt: string | null; // ISO ou null (null = acesso permanente)
+  trialSecondsTotal: number | null; // null = acesso permanente
+  trialSecondsUsed: number;
+  lastSeenAt: string | null; // ISO ou null (nunca acessou)
 };
 
 /** Lista todos os acessos (usuários) para a aba de administração. */
@@ -19,7 +21,9 @@ export async function getAccessList(): Promise<AccessRow[]> {
       name: true,
       role: true,
       createdAt: true,
-      expiresAt: true,
+      trialSecondsTotal: true,
+      trialSecondsUsed: true,
+      lastSeenAt: true,
     },
   });
 
@@ -29,6 +33,8 @@ export async function getAccessList(): Promise<AccessRow[]> {
     name: u.name,
     role: u.role,
     createdAt: u.createdAt.toISOString(),
-    expiresAt: u.expiresAt ? u.expiresAt.toISOString() : null,
+    trialSecondsTotal: u.trialSecondsTotal,
+    trialSecondsUsed: u.trialSecondsUsed,
+    lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString() : null,
   }));
 }

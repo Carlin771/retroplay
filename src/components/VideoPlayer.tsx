@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Props = {
@@ -19,8 +19,9 @@ export default function VideoPlayer({
   const ref = useRef<HTMLVideoElement>(null);
   const router = useRouter();
   const lastSent = useRef(0);
+  const [blocked, setBlocked] = useState(false);
 
-  function sendProgress(position: number, completed = false) {
+  async function sendProgress(position: number, completed = false) {
     const v = ref.current;
     const dur = Math.floor(v?.duration || durationSec || 0);
     const payload = JSON.stringify({
@@ -29,12 +30,23 @@ export default function VideoPlayer({
       durationSec: dur,
       completed,
     });
-    fetch("/api/progresso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: payload,
-      keepalive: true,
-    }).catch(() => {});
+    try {
+      const res = await fetch("/api/progresso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      });
+      const data = await res.json().catch(() => null);
+      // Acesso de teste sem saldo: pausa e mostra o aviso.
+      if (data?.blocked) {
+        setBlocked(true);
+        const vid = ref.current;
+        if (vid && !vid.paused) vid.pause();
+      }
+    } catch {
+      /* silencioso: salvar progresso é best-effort */
+    }
   }
 
   useEffect(() => {
@@ -86,16 +98,28 @@ export default function VideoPlayer({
   }
 
   return (
-    <video
-      ref={ref}
-      src={`/api/stream/${episodeId}`}
-      controls
-      autoPlay
-      playsInline
-      onTimeUpdate={onTimeUpdate}
-      onPause={onPause}
-      onEnded={onEnded}
-      className="mx-auto max-h-[85vh] w-auto max-w-full bg-black"
-    />
+    <div className="relative mx-auto w-fit max-w-full">
+      <video
+        ref={ref}
+        src={`/api/stream/${episodeId}`}
+        controls
+        autoPlay
+        playsInline
+        onTimeUpdate={onTimeUpdate}
+        onPause={onPause}
+        onEnded={onEnded}
+        className="mx-auto max-h-[85vh] w-auto max-w-full bg-black"
+      />
+      {blocked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/85 px-6 text-center">
+          <p className="text-lg font-semibold text-white">
+            Seu tempo de teste acabou
+          </p>
+          <p className="max-w-sm text-sm text-zinc-300">
+            Peça um novo acesso ao administrador para continuar assistindo.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

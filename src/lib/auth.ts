@@ -81,19 +81,42 @@ export async function getCurrentUser() {
   };
 }
 
+/** Acesso de teste (por tempo assistindo) esgotado? */
+export function isTrialExhausted(u: {
+  trialSecondsTotal: number | null;
+  trialSecondsUsed: number;
+}): boolean {
+  return u.trialSecondsTotal != null && u.trialSecondsUsed >= u.trialSecondsTotal;
+}
+
+/** Expiração legada por relógio (acessos antigos que usavam expiresAt). */
+export function isClockExpired(u: { expiresAt: Date | null }): boolean {
+  return u.expiresAt != null && u.expiresAt.getTime() <= Date.now();
+}
+
 /**
  * Como getCurrentUser, mas pensado para portões de acesso (assistir/stream):
- * retorna o usuário apenas se ele existir e não estiver expirado.
+ * retorna o usuário apenas se ele existir, não estiver expirado (legado) e
+ * ainda tiver saldo de teste.
  */
 export async function getActiveUser() {
   const session = await getSession();
   if (!session) return null;
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, email: true, name: true, role: true, expiresAt: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      expiresAt: true,
+      trialSecondsTotal: true,
+      trialSecondsUsed: true,
+    },
   });
   if (!user) return null;
-  if (user.expiresAt && user.expiresAt.getTime() <= Date.now()) return null;
+  if (isClockExpired(user)) return null;
+  if (isTrialExhausted(user)) return null;
   return user;
 }
 

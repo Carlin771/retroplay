@@ -46,9 +46,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const expiresAt = testMinutes
-    ? new Date(Date.now() + testMinutes * 60_000)
-    : null;
+  // Acesso de teste: saldo em segundos de TEMPO ASSISTINDO (não relógio).
+  const trialSecondsTotal = testMinutes ? testMinutes * 60 : null;
 
   const user = await prisma.user.create({
     data: {
@@ -56,9 +55,10 @@ export async function POST(req: NextRequest) {
       passwordHash: await hashPassword(password),
       name: name ?? null,
       role: "USER", // acessos criados aqui nunca são admin
-      expiresAt,
+      trialSecondsTotal,
+      trialSecondsUsed: 0,
     },
-    select: { id: true, email: true, expiresAt: true },
+    select: { id: true, email: true, trialSecondsTotal: true },
   });
 
   return NextResponse.json({
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     access: {
       id: user.id,
       email: user.email,
-      expiresAt: user.expiresAt ? user.expiresAt.toISOString() : null,
+      trialMinutes: user.trialSecondsTotal ? user.trialSecondsTotal / 60 : null,
     },
   });
 }
