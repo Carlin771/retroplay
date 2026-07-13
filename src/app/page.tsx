@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getSession();
+  const isAdmin = session?.role === "ADMIN";
   const [series, continueItems] = await Promise.all([
     getVisibleSeries(),
     session ? getContinueWatching(session.userId) : Promise.resolve([]),
@@ -37,11 +38,25 @@ export default async function Home() {
           ))}
         </Row>
       )}
-      <Row title="Todas as séries">
-        {series.map((s) => (
-          <SeriesCard key={s.id} series={s} />
-        ))}
-      </Row>
+      {isAdmin ? (
+        // Visão do admin: grade de 2 por linha, empilhando para baixo.
+        <section className="mb-8">
+          <h2 className="mb-3 px-4 text-lg font-bold md:px-8">
+            Todas as séries
+          </h2>
+          <div className="grid grid-cols-2 gap-3 px-4 md:px-8">
+            {series.map((s) => (
+              <SeriesCard key={s.id} series={s} fill />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <Row title="Todas as séries">
+          {series.map((s) => (
+            <SeriesCard key={s.id} series={s} />
+          ))}
+        </Row>
+      )}
     </div>
   );
 }

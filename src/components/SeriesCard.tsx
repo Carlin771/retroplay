@@ -2,11 +2,19 @@
 import Link from "next/link";
 import type { SeriesCardData } from "@/lib/catalog";
 
-export default function SeriesCard({ series }: { series: SeriesCardData }) {
+export default function SeriesCard({
+  series,
+  fill = false,
+}: {
+  series: SeriesCardData;
+  fill?: boolean;
+}) {
   return (
     <Link
       href={`/serie/${series.id}`}
-      className="group block w-36 shrink-0 sm:w-44"
+      className={
+        fill ? "group block w-full" : "group block w-36 shrink-0 sm:w-44"
+      }
     >
       <div className="aspect-[2/3] overflow-hidden rounded-lg bg-zinc-800">
         {series.coverUrl ? (
