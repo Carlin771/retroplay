@@ -4,12 +4,20 @@ import { Play } from "lucide-react";
 import type { ContinueItem } from "@/lib/catalog";
 import { watchedPercent } from "@/lib/format";
 
-export default function ContinueCard({ item }: { item: ContinueItem }) {
+export default function ContinueCard({
+  item,
+  fill = false,
+}: {
+  item: ContinueItem;
+  fill?: boolean;
+}) {
   const pct = watchedPercent(item.positionSec, item.durationSec);
   return (
     <Link
       href={`/assistir/${item.episodeId}`}
-      className="group block w-56 shrink-0 sm:w-64"
+      className={
+        fill ? "group block w-full" : "group block w-56 shrink-0 sm:w-64"
+      }
     >
       <div className="relative aspect-video overflow-hidden rounded-lg bg-zinc-800">
         <img
