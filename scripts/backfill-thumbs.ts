@@ -3,39 +3,54 @@ import { prisma } from "../src/lib/db";
 import { fetchMessageThumbnail } from "../src/lib/telegram";
 
 /**
- * Reprocessa as capas (miniaturas) dos capítulos.
+ * Reprocessa as capas (miniaturas) dos capítulos que estão SEM capa.
+ *
+ * Processa em LOTES para não estourar a memória (a lib do Telegram acumula
+ * estado em execuções muito longas). É resumível: cada rodada pega o próximo
+ * lote de capítulos ainda sem capa. Rode de novo até dizer "0 restantes".
  *
  * Uso:
- *   npm run backfill:thumbs           -> só os capítulos SEM capa
- *   npm run backfill:thumbs -- --all  -> TODOS (para melhorar/atualizar a qualidade)
- *
- * Baixa devagar (pausa entre cada) para não bater no limite de taxa do Telegram.
+ *   npm run backfill:thumbs                -> processa até 1500 por vez
+ *   npm run backfill:thumbs -- --limit 800 -> muda o tamanho do lote
  */
 
-const ALL = process.argv.includes("--all");
 const DELAY_MS = 400;
+
+function getLimit(): number {
+  const i = process.argv.indexOf("--limit");
+  if (i >= 0 && process.argv[i + 1]) {
+    const n = parseInt(process.argv[i + 1], 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 1500;
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 async function main() {
-  const episodes = await prisma.episode.findMany({
+  const LIMIT = getLimit();
+
+  const pending = await prisma.episode.count({ where: { thumbDataUrl: null } });
+  if (pending === 0) {
+    console.log("Nenhum capítulo sem capa. Nada a fazer.");
+    return;
+  }
+  console.log(`Capítulos sem capa: ${pending}. Processando até ${LIMIT} neste lote.`);
+
+  // Só os campos necessários (sem carregar as miniaturas existentes na memória).
+  const targets = await prisma.episode.findMany({
+    where: { thumbDataUrl: null },
     orderBy: [{ seasonId: "asc" }, { number: "asc" }],
+    take: LIMIT,
     select: {
       id: true,
       number: true,
       telegramMessageId: true,
-      thumbDataUrl: true,
       season: { select: { telegramChannelId: true } },
     },
   });
-
-  const targets = episodes.filter((e) => ALL || !e.thumbDataUrl);
-  console.log(
-    `Capítulos a processar: ${targets.length} de ${episodes.length} ` +
-      `(${ALL ? "todos" : "só sem capa"}).`,
-  );
 
   let ok = 0;
   let fail = 0;
@@ -63,13 +78,21 @@ async function main() {
       console.warn(`  falha no capítulo ${ep.number}:`, (e as Error).message);
     }
 
-    if ((i + 1) % 10 === 0 || i + 1 === targets.length) {
+    if ((i + 1) % 25 === 0 || i + 1 === targets.length) {
       console.log(`... ${i + 1}/${targets.length} (capas: ${ok}, falhas: ${fail})`);
     }
     await sleep(DELAY_MS);
   }
 
-  console.log(`\nConcluído. Capas atualizadas: ${ok}. Falhas: ${fail}.`);
+  const remaining = await prisma.episode.count({ where: { thumbDataUrl: null } });
+  console.log(`\nLote concluído. Capas atualizadas: ${ok}. Falhas: ${fail}.`);
+  if (remaining > 0) {
+    console.log(
+      `Ainda faltam ${remaining} sem capa. Rode o comando de novo para continuar.`,
+    );
+  } else {
+    console.log("Pronto! Todas as capas foram preenchidas.");
+  }
 }
 
 main()
