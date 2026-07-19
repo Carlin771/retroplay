@@ -11,7 +11,8 @@
     "db:studio": "prisma studio",
     "tg:login": "tsx scripts/tg-login.ts",
     "create:admin": "tsx scripts/create-admin.ts",
-    "index:channel": "tsx scripts/index-channel.ts"
+    "index:channel": "tsx scripts/index-channel.ts",
+    "backfill:thumbs": "tsx scripts/backfill-thumbs.ts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",

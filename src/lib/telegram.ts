@@ -216,14 +216,56 @@ export async function* iterateChannelVideos(
   }
 }
 
-async function downloadThumbnail(msg: Api.Message): Promise<string | null> {
+/** Índice da maior miniatura disponível (mais nítida que a prévia mínima). */
+function bestThumbIndex(msg: Api.Message): number {
+  const doc = getVideoDocument(msg);
+  const thumbs = (doc?.thumbs ?? []) as unknown as Array<{
+    w?: number;
+    h?: number;
+  }>;
+  let idx = 0;
+  let bestArea = -1;
+  thumbs.forEach((t, i) => {
+    const area = (t.w ?? 0) * (t.h ?? 0);
+    if (area > bestArea) {
+      bestArea = area;
+      idx = i;
+    }
+  });
+  return idx;
+}
+
+async function downloadThumbAt(
+  msg: Api.Message,
+  index: number,
+): Promise<string | null> {
   const client = await getClient();
   const buf = await withFloodRetry(() =>
-    client.downloadMedia(msg, { thumb: 0 }),
+    client.downloadMedia(msg, { thumb: index }),
+  ).catch(() => null);
+  if (!buf || typeof buf === "string" || buf.length === 0) return null;
+  return `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
+}
+
+async function downloadThumbnail(msg: Api.Message): Promise<string | null> {
+  // Tenta a maior miniatura (mais nítida); se falhar, cai para a menor.
+  const best = bestThumbIndex(msg);
+  return (await downloadThumbAt(msg, best)) ?? (await downloadThumbAt(msg, 0));
+}
+
+/** Rebaixa a miniatura de uma mensagem específica (usado para reprocessar capas). */
+export async function fetchMessageThumbnail(
+  channel: string,
+  messageId: number,
+): Promise<string | null> {
+  const client = await getClient();
+  const entity = await resolveEntity(channel);
+  const msgs = await withFloodRetry(() =>
+    client.getMessages(entity, { ids: [messageId] }),
   );
-  if (!buf || typeof buf === "string") return null;
-  const b64 = Buffer.from(buf).toString("base64");
-  return `data:image/jpeg;base64,${b64}`;
+  const msg = msgs[0];
+  if (!msg) return null;
+  return downloadThumbnail(msg as Api.Message);
 }
 
 // ---- Mídia para streaming ------------------------------------------------
